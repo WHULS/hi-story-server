@@ -153,6 +153,7 @@ public class MysqlConnector{
      */
     public void executeSql(String sqlString) {
         try {
+            System.out.println("执行: " + sqlString);
             if (getStmt().execute(sqlString)) {
                 setRs(getStmt().getResultSet());
             }

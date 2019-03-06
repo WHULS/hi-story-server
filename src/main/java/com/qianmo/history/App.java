@@ -37,11 +37,11 @@ public class App extends HttpServlet{
 
     // [Get 请求访问页面] doGet方法处理GET类型的请求
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
+//        System.out.print("GET - ");
+//        parseRequest(request);
+
         request.setCharacterEncoding("UTF-8");
         response.setContentType("text/html;charset=utf-8");
-
-        System.out.print("GET - ");
-        parseRequest(request);
     }
 
     // [Post 请求处理数据] doPost处理POST类型的请求
@@ -49,22 +49,79 @@ public class App extends HttpServlet{
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json; charset=utf-8");
 
+        // 获得参数信息
+        JsonReader jsonReader = Json.createReader(request.getInputStream());
+        JsonObject paramsObj = jsonReader.readObject();
+        jsonReader.close();
+        System.out.println(paramsObj.toString());
+
+
         System.out.print("POST - ");
         // 解析 request 获取请求信息
         String[] pathArr = parseRequest(request);
+        for (String path:
+             pathArr) {
+            System.out.println(path);
+        }
+
 
         // TODO: 分发请求信息
         String firstPath = pathArr[1];
         String secondPath = pathArr[2];
         String thirdPath = pathArr[3];
+
         try {
             if (firstPath.equals("api")) {
                 // 1. 用户 API
                 if (secondPath.equals("user")) {
                     // 1.1. 用户登录
                     if (thirdPath.equals("login")) {
-                        String account = getParam(request, "account");
-                        String password = getParam(request, "password");
+                        String account = paramsObj.getString("account");
+                        String password = paramsObj.getString("password");
+
+                        String sqlString = "SELECT * FROM user WHERE account=?";
+
+                        MysqlConnector conn = new MysqlConnector();
+                        try {
+                            // SQL 执行语句
+                            conn.executeSql(sqlString, new String[]{account});
+
+                            // 结果集
+                            ResultSet rs = conn.getRs();
+
+                            JsonObject responseData;
+                            if (rs.next()) {
+                                // 密码正确
+                                if (rs.getString("password").equals(password)) {
+                                    responseData = Json.createObjectBuilder()
+                                            .add("message", "登录成功")
+                                            .add("name", rs.getString("user_name"))
+                                            .add("status", 200)
+                                            .build();
+                                }
+                                // 账户密码错误
+                                else {
+                                    responseData = Json.createObjectBuilder()
+                                            .add("message", "账户[" + account + "]密码错误")
+                                            .add("status", 403)
+                                            .build();
+                                }
+                            } else {
+                                // 用户不存在
+                                responseData = Json.createObjectBuilder()
+                                        .add("message", "用户[" + account + "]不存在")
+                                        .add("status", 404)
+                                        .build();
+                            }
+
+                            // 发送 response
+                            PrintWriter responseWriter = response.getWriter();
+                            responseWriter.println(responseData.toString());
+                            responseWriter.flush();
+                            responseWriter.close();
+                        } catch (SQLException e) {
+                            System.out.println("[警告]" + e.getMessage());
+                        }
                     }
                     // 1.2. 用户注册
                     else if (thirdPath.equals("register")) {
@@ -95,7 +152,98 @@ public class App extends HttpServlet{
                     }
                     // 2.2 上传文件
                     else if (thirdPath.equals("upload-file")) {
+                        {
+                            // 获取用户信息
+                            String user = request.getParameter("userId");
 
+                            // 获得磁盘文件条目工厂
+                            DiskFileItemFactory factory = new DiskFileItemFactory();
+
+                            // 获取服务器下的工程文件中image文件夹的路径
+                            String path;
+                            if (user != null) {
+                                path = "C:/upload/images/" + user;
+                            } else {
+                                path = "C:/upload/images/default";
+                            }
+                            System.out.println("文件保存路径：" + path);
+
+                            /*
+                             * 限制文件大小
+                             */
+                            factory.setRepository(new File(path));
+                            // 设置 缓存的大小，当上传文件的容量超过该缓存时，直接放到 暂时存储室
+                            factory.setSizeThreshold(1024 * 1024);
+
+
+                            // 高水平的API文件上传处理
+                            ServletFileUpload upload = new ServletFileUpload(factory);
+                            try {
+                                // 可以上传多个文件
+                                List<FileItem> list = upload.parseRequest(request);
+
+                                for (FileItem item : list) {
+                                    // 获取表单的属性名字
+                                    String name = item.getFieldName();
+
+                                    // 如果获取的 表单信息是普通的 文本 信息
+                                    if (item.isFormField()) {
+                                        // 获取用户具体输入的字符串，因为表单提交过来的是 字符串类型的
+                                        String value = item.getString();
+
+                                        request.setAttribute(name, value);
+                                    }
+                                    // 对传入的非 简单的字符串进行处理 ，比如说二进制的 图片，电影这些
+                                    else {
+                                        /*
+                                         * 以下三步，主要获取 上传文件的名字
+                                         */
+                                        // 获取路径名
+                                        String value = item.getName();
+
+                                        // 索引到最后一个反斜杠
+                                        int start = value.lastIndexOf("/");
+
+                                        // 截取上传文件的 字符串名字，加1是去掉反斜杠，
+                                        String filename = value.substring(start + 1);
+                                        request.setAttribute(name, filename);
+
+                                        // 真正写到磁盘上
+                                        OutputStream out = new FileOutputStream(new File(path, filename));
+                                        InputStream in = item.getInputStream();
+
+                                        int length;
+                                        byte[] buf = new byte[1024];
+                                        System.out.println("获取上传文件的总共的容量：" + item.getSize() + "文件名为：" + path + "\\" + filename);
+
+                                        //向数据库中写入文件路径
+//                    Image image = new Image();
+//                    image.setAddress("image/"+filename);
+//                    Images images = new Images();
+//                    //把文件名写到数据库中。<span style="font-family: Arial, Helvetica, sans-serif;">
+//                    images.updateImage(image);
+
+                                        // in.read(buf) 每次读到的数据存放在 buf 数组中
+                                        while ((length = in.read(buf)) != -1) {
+                                            // 在 buf 数组中 取出数据 写到 （输出流）磁盘上
+                                            out.write(buf, 0, length);
+                                        }
+                                        in.close();
+                                        out.close();
+
+                                        // 删除临时文件
+                                        item.delete();
+                                    }
+                                }
+
+                            } catch (FileUploadException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }
+//        List<Image> imageList = getImage();
+//        request.setAttribute("imageList", imageList);
+                            request.getRequestDispatcher("/map").forward(request, response);
+                        }
                     }
 
                     // 2.3 获取所有作品
@@ -109,101 +257,9 @@ public class App extends HttpServlet{
                 throw new ServletException("请求路径不存在");
             }
         } catch (ServletException err) {
-            System.out.println(err.getMessage());
-        }
-
-
-       {
-            // 获取用户信息
-            String user = request.getParameter("userId");
-
-            // 获得磁盘文件条目工厂
-            DiskFileItemFactory factory = new DiskFileItemFactory();
-
-            // 获取服务器下的工程文件中image文件夹的路径
-            String path;
-            if (user != null) {
-                path = "C:/upload/images/" + user;
-            } else {
-                path = "C:/upload/images/default";
-            }
-            System.out.println("文件保存路径：" + path);
-
-            /*
-             * 限制文件大小
-             */
-            factory.setRepository(new File(path));
-            // 设置 缓存的大小，当上传文件的容量超过该缓存时，直接放到 暂时存储室
-            factory.setSizeThreshold(1024 * 1024);
-
-
-            // 高水平的API文件上传处理
-            ServletFileUpload upload = new ServletFileUpload(factory);
-            try {
-                // 可以上传多个文件
-                List<FileItem> list = upload.parseRequest(request);
-
-                for (FileItem item : list) {
-                    // 获取表单的属性名字
-                    String name = item.getFieldName();
-
-                    // 如果获取的 表单信息是普通的 文本 信息
-                    if (item.isFormField()) {
-                        // 获取用户具体输入的字符串，因为表单提交过来的是 字符串类型的
-                        String value = item.getString();
-
-                        request.setAttribute(name, value);
-                    }
-                    // 对传入的非 简单的字符串进行处理 ，比如说二进制的 图片，电影这些
-                    else {
-                        /*
-                         * 以下三步，主要获取 上传文件的名字
-                         */
-                        // 获取路径名
-                        String value = item.getName();
-
-                        // 索引到最后一个反斜杠
-                        int start = value.lastIndexOf("/");
-
-                        // 截取上传文件的 字符串名字，加1是去掉反斜杠，
-                        String filename = value.substring(start + 1);
-                        request.setAttribute(name, filename);
-
-                        // 真正写到磁盘上
-                        OutputStream out = new FileOutputStream(new File(path, filename));
-                        InputStream in = item.getInputStream();
-
-                        int length;
-                        byte[] buf = new byte[1024];
-                        System.out.println("获取上传文件的总共的容量：" + item.getSize() + "文件名为：" + path + "\\" + filename);
-
-                        //向数据库中写入文件路径
-//                    Image image = new Image();
-//                    image.setAddress("image/"+filename);
-//                    Images images = new Images();
-//                    //把文件名写到数据库中。<span style="font-family: Arial, Helvetica, sans-serif;">
-//                    images.updateImage(image);
-
-                        // in.read(buf) 每次读到的数据存放在 buf 数组中
-                        while ((length = in.read(buf)) != -1) {
-                            // 在 buf 数组中 取出数据 写到 （输出流）磁盘上
-                            out.write(buf, 0, length);
-                        }
-                        in.close();
-                        out.close();
-
-                        // 删除临时文件
-                        item.delete();
-                    }
-                }
-
-            } catch (FileUploadException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-//        List<Image> imageList = getImage();
-//        request.setAttribute("imageList", imageList);
-            request.getRequestDispatcher("/map").forward(request, response);
+            System.out.println("[警告]" + err.getMessage());
+        } catch (IOException err) {
+            System.out.println("[警告]" + err.getMessage());
         }
     }
 
@@ -237,39 +293,5 @@ public class App extends HttpServlet{
 
         // 返回字符串数组
         return outStringArr;
-    }
-
-    /**
-     * 获取请求体的 body 字符串
-     * @param br request.getReader()
-     * @return String
-     */
-    private String getBodyString(BufferedReader br) {
-        String inputLine;
-        String str = "";
-        try {
-            while ((inputLine = br.readLine()) != null) {
-                str += inputLine;
-            }
-            br.close();
-        } catch (IOException e) {
-            System.out.println("IOException: " + e);
-        }
-        return str;
-    }
-
-    /**
-     * 获得请求体 body 中的指定参数
-     * @param request Servlet 请求
-     * @param paramName 参数名
-     * @return 获得的参数内容
-     * @throws IOException
-     */
-    private String getParam(HttpServletRequest request, String paramName) throws IOException {
-        JsonReader jsonReader = Json.createReader(request.getInputStream());
-        JsonObject jsonObject = jsonReader.readObject();
-        jsonReader.close();
-
-        return jsonObject.getString(paramName);
     }
 }
