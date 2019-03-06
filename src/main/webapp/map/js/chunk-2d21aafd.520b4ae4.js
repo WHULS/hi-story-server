@@ -1,0 +1,2 @@
+(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d21aafd"],{bd27:function(e,n,t){"use strict";t.r(n);var c=function(){var e=this,n=e.$createElement;e._self._c;return e._m(0)},a=[function(){var e=this,n=e.$createElement,t=e._self._c||n;return t("div",[t("h1",[e._v("考点查询")])])}],r={name:"keyPoint",data:function(){return{}},methods:{}},u=r,i=t("17cc"),o=Object(i["a"])(u,c,a,!1,null,"12e8e543",null);n["default"]=o.exports}}]);
+//# sourceMappingURL=chunk-2d21aafd.520b4ae4.js.map
