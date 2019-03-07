@@ -4,6 +4,8 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.sql.ResultSet;
@@ -20,34 +22,28 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class App extends HttpServlet{
+public class Server extends HttpServlet{
     private static final long serialVersionUID = 1L;
 
-    public App() {
+    public Server() {
         super();
     }
 
-    private void printTime() {
-        // 设置日期格式
-        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-
-        // 输出当前系统时间
-        System.out.print(df.format(new Date()));
-    }
-
     // [Get 请求访问页面] doGet方法处理GET类型的请求
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-//        System.out.print("GET - ");
-//        parseRequest(request);
-
-        request.setCharacterEncoding("UTF-8");
-        response.setContentType("text/html;charset=utf-8");
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        doPost(request, response);
     }
 
     // [Post 请求处理数据] doPost处理POST类型的请求
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        response.setCharacterEncoding("UTF-8");
+        request.setCharacterEncoding("UTF-8");
         response.setContentType("application/json; charset=utf-8");
+
+        // 解析 request 获取请求信息
+        String[] pathArr = parseRequest(request);
+        for (String path : pathArr) {
+            System.out.println(path);
+        }
 
         // 获得参数信息
         JsonReader jsonReader = Json.createReader(request.getInputStream());
@@ -55,20 +51,15 @@ public class App extends HttpServlet{
         jsonReader.close();
         System.out.println(paramsObj.toString());
 
-
-        System.out.print("POST - ");
-        // 解析 request 获取请求信息
-        String[] pathArr = parseRequest(request);
-        for (String path:
-             pathArr) {
-            System.out.println(path);
-        }
-
-
         // TODO: 分发请求信息
-        String firstPath = pathArr[1];
-        String secondPath = pathArr[2];
-        String thirdPath = pathArr[3];
+        if (pathArr[0] == "test") {
+            for (int i = 0; i < 2; i++) {
+                pathArr[i] = pathArr[i+1];
+            }
+        }
+        String firstPath = pathArr[0];
+        String secondPath = pathArr[1];
+        String thirdPath = pathArr[2];
 
         try {
             if (firstPath.equals("api")) {
@@ -89,29 +80,23 @@ public class App extends HttpServlet{
                             // 结果集
                             ResultSet rs = conn.getRs();
 
-                            JsonObject responseData;
+                            JSONObject responseData = new JSONObject();
                             if (rs.next()) {
                                 // 密码正确
                                 if (rs.getString("password").equals(password)) {
-                                    responseData = Json.createObjectBuilder()
-                                            .add("message", "登录成功")
-                                            .add("name", rs.getString("user_name"))
-                                            .add("status", 200)
-                                            .build();
+                                    responseData.put("message", "登录成功")
+                                            .put("name", rs.getString("user_name"))
+                                            .put("status", 200);
                                 }
                                 // 账户密码错误
                                 else {
-                                    responseData = Json.createObjectBuilder()
-                                            .add("message", "账户[" + account + "]密码错误")
-                                            .add("status", 403)
-                                            .build();
+                                    responseData.put("message", "账户[" + account + "]密码错误")
+                                            .put("status", 403);
                                 }
                             } else {
                                 // 用户不存在
-                                responseData = Json.createObjectBuilder()
-                                        .add("message", "用户[" + account + "]不存在")
-                                        .add("status", 404)
-                                        .build();
+                                responseData.put("message", "用户[" + account + "]不存在")
+                                        .put("status", 404);
                             }
 
                             // 发送 response
@@ -121,6 +106,8 @@ public class App extends HttpServlet{
                             responseWriter.close();
                         } catch (SQLException e) {
                             System.out.println("[警告]" + e.getMessage());
+                        } finally {
+                            conn.release();
                         }
                     }
                     // 1.2. 用户注册
@@ -141,7 +128,7 @@ public class App extends HttpServlet{
                     else if (thirdPath.equals("alter-work")) {
 
                     } else {
-                        throw new ServletException("请求路径不存在");
+                        throw new ServletException("[警告]请求路径不存在");
                     }
                 }
                 // 2. 通用 API
@@ -250,17 +237,93 @@ public class App extends HttpServlet{
                     else if (thirdPath.equals("fetch-all-work")) {
 
                     } else {
-                        throw new ServletException("请求路径不存在");
+                        throw new ServletException("[警告]请求路径不存在");
                     }
                 }
+                // 3. 数据 API
+                else if (secondPath.equals("data")) {
+                    // 3.1 查询人物事件
+                    if (thirdPath.equals("events")) {
+                        String personName = paramsObj.getString("name");
+
+                        String sqlString = "SELECT\n" +
+                                "\tLON,\n" +
+                                "\tLAT,\n" +
+                                "\t`YEAR`,\n" +
+                                "\t`EVENT`,\n" +
+                                "\tANCIENT_PLACE,\n" +
+                                "\tMODERN_PLACE,\n" +
+                                "\tperson.`NAME` \n" +
+                                "FROM\n" +
+                                "\t`events`\n" +
+                                "\tINNER JOIN person \n" +
+                                "WHERE\n" +
+                                "\t`person`.`NAME` = ? \n" +
+                                "\tAND `events`.PERSON_ID = person.PERSON_ID \n" +
+                                "\tAND `events`.LON IS NOT NULL;";
+
+                        MysqlConnector conn = new MysqlConnector();
+
+                        try {
+                            conn.executeSql(sqlString, new Object[]{personName});
+
+                            ResultSet rs = conn.getRs();
+
+                            JSONObject responseData = new JSONObject();
+                            JSONArray dataArr = new JSONArray();
+                            while (rs.next()) {
+                                double Lon = rs.getDouble("LON");
+                                double Lat = rs.getDouble("LAT");
+                                String Year = rs.getString("YEAR");
+                                String Event = rs.getString("EVENT");
+                                String Ancient_Place = rs.getString("ANCIENT_PLACE");
+                                String Modern_Place = rs.getString("MODERN_PLACE");
+                                String Person_Name = rs.getString("NAME");
+
+                                dataArr.put(
+                                    new JSONObject().put("Lon",Lon)
+                                        .put("Lat",Lat)
+                                        .put("Year",Year)
+                                        .put("Event",Event)
+                                        .put("Ancient_Place",Ancient_Place)
+                                        .put("Modern_Place",Modern_Place)
+                                        .put("Person_Name",Person_Name)
+                                );
+                            }
+
+                            responseData.put("data", dataArr);
+
+                            PrintWriter responseWriter = response.getWriter();
+                            responseWriter.println(dataArr.toString());
+                            responseWriter.flush();
+                            responseWriter.close();
+                        } catch (SQLException ex) {
+                            System.out.println("[警告]" + ex);
+                        } finally {
+                            conn.release();
+                        }
+                    }
+                } else {
+                    throw new ServletException("[警告]请求路径不存在");
+                }
             } else {
-                throw new ServletException("请求路径不存在");
+                throw new ServletException("[警告]请求路径不存在");
             }
-        } catch (ServletException err) {
-            System.out.println("[警告]" + err.getMessage());
         } catch (IOException err) {
             System.out.println("[警告]" + err.getMessage());
         }
+    }
+
+
+    /**
+     * 输出时间
+     */
+    private void printTime() {
+        // 设置日期格式
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+        // 输出当前系统时间
+        System.out.print(df.format(new Date()));
     }
 
     /**

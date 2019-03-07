@@ -15,7 +15,7 @@ public class CorsFilter implements Filter {
             throws IOException, ServletException {
 
         HttpServletResponse res = (HttpServletResponse) response;
-        res.setContentType("text/html;charset=UTF-8");
+        res.setContentType("application/json;charset=UTF-8");
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
         res.setHeader("Access-Control-Max-Age", "0");

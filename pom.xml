@@ -46,11 +46,11 @@
       <artifactId>commons-fileupload</artifactId>
       <version>1.4</version>
     </dependency>
-    <!--<dependency>-->
-      <!--<groupId>org.json</groupId>-->
-      <!--<artifactId>json</artifactId>-->
-      <!--<version>20180813</version>-->
-    <!--</dependency>-->
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20180813</version>
+    </dependency>
     <dependency>
       <groupId>org.glassfish</groupId>
       <artifactId>javax.json</artifactId>
@@ -64,7 +64,7 @@
   </dependencies>
 
   <build>
-    <finalName>test</finalName>
+    <finalName>ROOT</finalName>
     <pluginManagement><!-- lock down plugins versions to avoid using Maven defaults (may be moved to parent pom) -->
       <plugins>
         <!-- clean lifecycle, see https://maven.apache.org/ref/current/maven-core/lifecycles.html#clean_Lifecycle -->
