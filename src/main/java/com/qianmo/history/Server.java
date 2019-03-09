@@ -45,12 +45,6 @@ public class Server extends HttpServlet{
             System.out.println(path);
         }
 
-        // 获得参数信息
-        JsonReader jsonReader = Json.createReader(request.getInputStream());
-        JsonObject paramsObj = jsonReader.readObject();
-        jsonReader.close();
-        System.out.println(paramsObj.toString());
-
         // 分发请求信息
         if (pathArr[0] == "test") {
             for (int i = 0; i < 2; i++) {
@@ -60,6 +54,18 @@ public class Server extends HttpServlet{
         String firstPath = pathArr[0];
         String secondPath = pathArr[1];
         String thirdPath = pathArr[2];
+
+        
+        // 获得参数信息
+        JsonObject paramsObj;
+        if (!thirdPath.equals("upload-file")) {
+            JsonReader jsonReader = Json.createReader(request.getInputStream());
+            paramsObj = jsonReader.readObject();
+            jsonReader.close();
+            System.out.println(paramsObj.toString());
+        } else {
+            paramsObj = Json.createObjectBuilder().add("type", "上传文件").build();
+        }
 
         try {
             if (firstPath.equals("api")) {
@@ -334,97 +340,96 @@ public class Server extends HttpServlet{
                     // 2.2 上传文件
                     else if (thirdPath.equals("upload-file")) {
                         System.out.println("上传文件");
-                        {
-                            // 获取用户信息
-                            String user = request.getParameter("userId");
+                    
+                        // TODO: 获取用户信息
+                        String user = "default";
 
-                            // 获得磁盘文件条目工厂
-                            DiskFileItemFactory factory = new DiskFileItemFactory();
+                        // 获得磁盘文件条目工厂
+                        DiskFileItemFactory factory = new DiskFileItemFactory();
 
-                            // 获取服务器下的工程文件中image文件夹的路径
-                            String path;
-                            if (user != null) {
-                                path = "C:/upload/images/" + user;
-                            } else {
-                                path = "C:/upload/images/default";
-                            }
-                            System.out.println("文件保存路径：" + path);
+                        // 获取服务器下的工程文件中image文件夹的路径
+                        String path = request.getSession().getServletContext().getRealPath("/")+"img";
+                        System.out.println("文件保存路径：" + path);
 
-                            /*
-                             * 限制文件大小
-                             */
-                            factory.setRepository(new File(path));
-                            // 设置 缓存的大小，当上传文件的容量超过该缓存时，直接放到 暂时存储室
-                            factory.setSizeThreshold(1024 * 1024);
+                        /*
+                        * 限制文件大小
+                        */
+                        factory.setRepository(new File(path));
+                        // 设置 缓存的大小，当上传文件的容量超过该缓存时，直接放到 暂时存储室
+                        factory.setSizeThreshold(1024 * 1024);
 
 
-                            // 高水平的API文件上传处理
-                            ServletFileUpload upload = new ServletFileUpload(factory);
-                            try {
-                                // 可以上传多个文件
-                                List<FileItem> list = upload.parseRequest(request);
+                        // 高水平的API文件上传处理
+                        ServletFileUpload upload = new ServletFileUpload(factory);
+                        try {
+                            // 可以上传多个文件
+                            List<FileItem> list = upload.parseRequest(request);
 
-                                for (FileItem item : list) {
-                                    // 获取表单的属性名字
-                                    String name = item.getFieldName();
+                            for (FileItem item : list) {
+                                // 获取表单的属性名字
+                                String name = item.getFieldName();
 
-                                    // 如果获取的 表单信息是普通的 文本 信息
-                                    if (item.isFormField()) {
-                                        // 获取用户具体输入的字符串，因为表单提交过来的是 字符串类型的
-                                        String value = item.getString();
+                                // 如果获取的 表单信息是普通的 文本 信息
+                                if (item.isFormField()) {
+                                    // 获取用户具体输入的字符串，因为表单提交过来的是 字符串类型的
+                                    String value = item.getString();
 
-                                        request.setAttribute(name, value);
-                                    }
-                                    // 对传入的非 简单的字符串进行处理 ，比如说二进制的 图片，电影这些
-                                    else {
-                                        /*
-                                         * 以下三步，主要获取 上传文件的名字
-                                         */
-                                        // 获取路径名
-                                        String value = item.getName();
-
-                                        // 索引到最后一个反斜杠
-                                        int start = value.lastIndexOf("/");
-
-                                        // 截取上传文件的 字符串名字，加1是去掉反斜杠，
-                                        String filename = value.substring(start + 1);
-                                        request.setAttribute(name, filename);
-
-                                        // 真正写到磁盘上
-                                        OutputStream out = new FileOutputStream(new File(path, filename));
-                                        InputStream in = item.getInputStream();
-
-                                        int length;
-                                        byte[] buf = new byte[1024];
-                                        System.out.println("获取上传文件的总共的容量：" + item.getSize() + "文件名为：" + path + "\\" + filename);
-
-                                        //向数据库中写入文件路径
-                                        // Image image = new Image();
-                                        // image.setAddress("image/"+filename);
-                                        // Images images = new Images();
-                                        // //把文件名写到数据库中。<span style="font-family: Arial, Helvetica, sans-serif;">
-                                        // images.updateImage(image);
-
-                                        // in.read(buf) 每次读到的数据存放在 buf 数组中
-                                        while ((length = in.read(buf)) != -1) {
-                                            // 在 buf 数组中 取出数据 写到 （输出流）磁盘上
-                                            out.write(buf, 0, length);
-                                        }
-                                        in.close();
-                                        out.close();
-
-                                        // 删除临时文件
-                                        item.delete();
-                                    }
+                                    request.setAttribute(name, value);
                                 }
+                                // 对传入的非 简单的字符串进行处理 ，比如说二进制的 图片，电影这些
+                                else {
+                                    /*
+                                        * 以下三步，主要获取 上传文件的名字
+                                        */
+                                    // 获取路径名
+                                    String value = item.getName();
 
-                            } catch (FileUploadException e) {
-                                // TODO Auto-generated catch block
-                                e.printStackTrace();
+                                    // 索引到最后一个反斜杠
+                                    int start = value.lastIndexOf("/");
+
+                                    // 截取上传文件的 字符串名字，加1是去掉反斜杠，
+                                    String filename = value.substring(start + 1);
+
+                                    request.setAttribute(name, filename);
+
+                                    // 真正写到磁盘上
+                                    OutputStream out = new FileOutputStream(new File(path, filename));
+                                    InputStream in = item.getInputStream();
+
+                                    int length;
+                                    byte[] buf = new byte[1024];
+                                    String filePath = path + "\\" + filename;
+                                    System.out.println("获取上传文件的总共的容量：" + item.getSize() + "文件名为：" + filePath);
+                                    
+                                    JSONObject responseData = new JSONObject();
+                                    responseData.put("filePath", "img/" + filename);
+                                    PrintWriter responseWriter = response.getWriter();
+                                    responseWriter.println(responseData.toString());
+                                    responseWriter.flush();
+                                    responseWriter.close();
+
+                                    //向数据库中写入文件路径
+                                    // Image image = new Image();
+                                    // image.setAddress("image/"+filename);
+                                    // Images images = new Images();
+                                    // //把文件名写到数据库中。<span style="font-family: Arial, Helvetica, sans-serif;">
+                                    // images.updateImage(image);
+
+                                    // in.read(buf) 每次读到的数据存放在 buf 数组中
+                                    while ((length = in.read(buf)) != -1) {
+                                        // 在 buf 数组中 取出数据 写到 （输出流）磁盘上
+                                        out.write(buf, 0, length);
+                                    }
+                                    // 删除临时文件
+                                    item.delete();
+
+                                    in.close();
+                                    out.close();
+                                }
                             }
-                            // List<Image> imageList = getImage();
-                            // request.setAttribute("imageList", imageList);
-                            request.getRequestDispatcher("/map").forward(request, response);
+
+                        } catch (FileUploadException e) {
+                            e.printStackTrace();
                         }
                     }
 

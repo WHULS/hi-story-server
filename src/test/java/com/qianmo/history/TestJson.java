@@ -3,6 +3,9 @@ package com.qianmo.history;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -12,6 +15,8 @@ public class TestJson {
         // jsonArray.put(new JSONObject().put("AAA", "aa"));
 
         System.out.println(getCurrentTime());
+
+        System.out.println(new Date().getTime());
     }
 
     private static String getCurrentTime() {
