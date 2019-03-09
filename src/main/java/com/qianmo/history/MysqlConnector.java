@@ -103,13 +103,13 @@ public class MysqlConnector{
     /**
      * 4.1 默认构造函数
      */
-    public MysqlConnector() {
+    public MysqlConnector() throws SQLException {
         // 1. Register MySQL Connector/J
         try {
             Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
         }catch (Exception ex) {
             // handle the error
-            System.out.println(ex.toString());
+            throw new SQLException("连接数据库出错");
         }
 
         // 2. Obtain a Connection instance from the DriverManager
@@ -164,7 +164,6 @@ public class MysqlConnector{
 
     public void executeSql(String sqlString, Object[] params) throws SQLException {
         String[] dividedSql = sqlString.split("\\?");
-
         String newSqlString = "";
 
         // 最后一个字符是问号
@@ -215,6 +214,13 @@ public class MysqlConnector{
             }
 
             setStmt(null);
+        }
+
+        // 断开连接
+        try {
+            getConn().close();
+        } catch (SQLException e) {
+            System.out.println("[警告]" + e.getMessage());
         }
     }
 }

@@ -16,9 +16,9 @@ import java.util.regex.Pattern;
 
 public class testMysql {
     public static void main(String[] args) {
-//        testLogin();
-//        testUpdata();
-        testQueryEvent();
+        // testLogin();
+        testUpdata();
+        // testQueryEvent();
     }
 
     public static void testQueryEvent() {
@@ -38,8 +38,8 @@ public class testMysql {
                 "\tAND `events`.PERSON_ID = person.PERSON_ID \n" +
                 "\tAND `events`.LON IS NOT NULL;";
 
-        MysqlConnector conn = new MysqlConnector();
         try {
+            MysqlConnector conn = new MysqlConnector();
             conn.executeSql(sqlString, new Object[]{"李清照"});
 
             ResultSet rs = conn.getRs();
@@ -65,6 +65,7 @@ public class testMysql {
                 );
             }
 
+            conn.release();
             System.out.println(responseData.toString());
         } catch (SQLException ex) {
             System.out.println(ex);
@@ -79,8 +80,8 @@ public class testMysql {
 
         String sqlString = "SELECT * FROM user WHERE account=?";
 
-        MysqlConnector conn = new MysqlConnector();
         try {
+            MysqlConnector conn = new MysqlConnector();
             // SQL 执行语句
             conn.executeSql(sqlString, new String[]{account});
 
@@ -108,39 +109,45 @@ public class testMysql {
                         .build();
             }
             System.out.println(responseData.toString());
+
+            conn.release();
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
     }
 
     private static void testUpdata() {
-        MysqlConnector conn = new MysqlConnector();
-
-        conn.executeSql("SELECT * FROM events");
-
-        ResultSet rs = conn.getRs();
 
         try {
+            MysqlConnector conn = new MysqlConnector();
+
+            conn.executeSql("SELECT * FROM events");
+
+            ResultSet rs = conn.getRs();
+
             while (rs.next()) {
-                String placeString = rs.getString("PLACESTRING");
+                String LONLAT = rs.getString("LONLAT");
+                int id = rs.getInt("ID");
 
-//                System.out.println(LonLat[0] + "," + LonLat[1]);
+                // System.out.println(lonLat != null);
 
-//                System.out.println(lonLat != null);
+                if (LONLAT != null) {
+                    double[] LonLat = parseLonLat(LONLAT);
 
-                if (placeString != null) {
-                    String ancientPlace = placeString.split("（")[0];
-                    String sqlString = "UPDATE events SET ANCIENT_PLACE=? WHERE PLACESTRING=?;";
+                    System.out.println(LonLat[0] + "," + LonLat[1]);
+
+                    // String ancientPlace = placeString.split("（")[0];
+                    String sqlString = "UPDATE events SET LON=?,LAT=? WHERE ID=?";
                     MysqlConnector newConn = new MysqlConnector();
-                    newConn.executeSql(sqlString, new Object[]{ancientPlace, placeString});
+                    newConn.executeSql(sqlString, new Object[]{LonLat[0], LonLat[1], id});
                     newConn.release();
                 }
             }
+
+            conn.release();
         } catch (SQLException e) {
             System.out.println(e.getMessage());
-        } finally {
-            conn.release();
-        }
+        } 
     }
 
     private static double[] parseLonLat(String s) {
